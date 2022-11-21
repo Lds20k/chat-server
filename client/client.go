@@ -1,37 +1,56 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"os"
+	"time"
 )
-
-func mustCopy(dst io.Writer, src io.Reader) {
-	if _, err := io.Copy(dst, src); err != nil {
-		log.Fatal(err)
-	}
-}
 
 func main() {
 	conn, err := net.Dial("tcp", "localhost:3000")
-	fmt.Println("Connected!")
+	fmt.Println("-- connected --")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	done := make(chan struct{})
+	exit := false
 
 	go func() {
-		io.Copy(os.Stdout, conn)
-		log.Println("done")
-		done <- struct{}{} // sinaliza para a gorrotina principal
+		for !exit {
+			io.Copy(os.Stdout, conn)
+			fmt.Println("-- disconnected --")
+			retry := true
+			for !exit && retry {
+				time.Sleep(time.Second)
+				fmt.Println("-- retry connection --")
+				conn, err = net.Dial("tcp", "localhost:3000")
+				if err == nil {
+					fmt.Println("-- reconnected --")
+					retry = false
+				}
+
+			}
+		}
+		fmt.Println("-- exit --")
+		conn.Close()
+		os.Exit(0)
 	}()
 
-	mustCopy(conn, os.Stdin)
+	for {
+		reader := bufio.NewReader(os.Stdin)
+		text, _ := reader.ReadString('\n')
 
-	conn.Close()
+		if text == "/exit\n" {
+			exit = true
+		}
 
-	<-done // espera a gorrotina terminar
+		if _, err := conn.Write([]byte(text)); err != nil {
+			log.Println(err)
+			return
+		}
+	}
 }

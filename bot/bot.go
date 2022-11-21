@@ -29,7 +29,7 @@ func main() {
 	tmp := make([]byte, 1024)
 	stop := false
 
-	if _, err := conn.Write([]byte("/nick [bot](inverter)\n")); err != nil {
+	if _, err := conn.Write([]byte("/nick [bot](reverse)\n")); err != nil {
 		log.Println(err)
 		return
 	}
@@ -57,7 +57,7 @@ func main() {
 		user_text := strings.SplitN(buffer, ": ", 2)
 
 		if len(user_text) >= 2 {
-			if user_text[0] != "[bot](inverter)" {
+			if user_text[0] != "[global] [bot](reverse)" {
 				user := "{" + user_text[0] + "}"
 				text := user_text[1]
 				if _, err := conn.Write([]byte(user + " -> " + reverse(text) + "\n")); err != nil {

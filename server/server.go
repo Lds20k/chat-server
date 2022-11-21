@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strconv"
 	"strings"
 )
 
@@ -33,8 +34,10 @@ func broadcaster() {
 				cli <- msg
 			}
 		case cli := <-entering:
+			fmt.Println(users)
 			clients[cli] = true
 		case cli := <-leaving:
+			fmt.Println(users)
 			delete(clients, cli)
 			close(cli)
 		}
@@ -56,10 +59,9 @@ func handleConn(conn net.Conn) {
 		chanel: ch,
 	}
 	users[user_obj.nick] = user_obj
-	fmt.Println(users)
 
-	ch <- "vc é " + user_obj.nick
-	messages <- user_obj.nick + " chegou!"
+	ch <- "[server] You nick are \"" + user_obj.nick + "\""
+	messages <- "[server] \"" + user_obj.nick + "\"" + " has arrived!"
 	entering <- ch
 
 	input := bufio.NewScanner(conn)
@@ -73,9 +75,12 @@ main_loop:
 			case "nick":
 				if len(arguments) == 1 {
 					if _, ok := users[arguments[0]]; !ok {
-						var old_nick = user_obj.nick
+						old_nick := user_obj.nick
 						user_obj.nick = arguments[0]
-						fmt.Println("\"" + old_nick + "\" change nick to \"" + user_obj.nick + "\"")
+						message := "[server] \"" + old_nick + "\" change nick to \"" + user_obj.nick + "\""
+
+						fmt.Println(message)
+						messages <- message
 
 						delete(users, old_nick)
 						users[user_obj.nick] = user_obj
@@ -87,7 +92,7 @@ main_loop:
 				}
 			case "exit":
 				if len(arguments) == 0 {
-					fmt.Println("\"" + user_obj.nick + "\" exit from server")
+					fmt.Println("[server] \"" + user_obj.nick + "\" exit from server")
 					break main_loop
 				} else {
 					user_obj.chanel <- "[server] Invalid arguments!"
@@ -97,7 +102,7 @@ main_loop:
 					fmt.Print("private to " + arguments[0] + ": ")
 					if user_s, ok := users[arguments[0]]; ok {
 						fmt.Println("-send-")
-						user_s.chanel <- "[private] " + user_obj.nick + ": " + strings.Join(arguments[1:], " ")
+						user_s.chanel <- "[--private--] " + user_obj.nick + ": " + strings.Join(arguments[1:], " ")
 						user_obj.chanel <- "[server] Message sended!"
 					} else {
 						fmt.Println("-not found-")
@@ -106,20 +111,32 @@ main_loop:
 				} else {
 					user_obj.chanel <- "[server] Invalid arguments!"
 				}
+			case "list":
+				if len(arguments) == 0 {
+					user_obj.chanel <- "[server] --- user list ---"
+					user_obj.chanel <- "[server] total: " + strconv.Itoa(len(users))
+					user_obj.chanel <- "[server] -----------------"
+					for key := range users {
+						user_obj.chanel <- "[server] " + key
+					}
+					user_obj.chanel <- "[server] -----------------"
+				} else {
+					user_obj.chanel <- "[server] Invalid arguments!"
+				}
 			default:
-				var error_message string = "command \"" + command + "\" not found"
+				var error_message string = "[server] Command \"" + command + "\" not found"
 				fmt.Println(error_message)
 				messages <- error_message
 			}
 
 		} else {
-			messages <- user_obj.nick + ": " + text
+			messages <- "[global] " + user_obj.nick + ": " + text
 		}
 	}
 
-	leaving <- ch
-	messages <- user_obj.nick + " saiu do servidor"
+	messages <- "[server] \"" + user_obj.nick + "\" exit from the server"
 	delete(users, user_obj.nick)
+	leaving <- ch
 	conn.Close()
 }
 
@@ -129,7 +146,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	go broadcaster()
+
 	for {
 		conn, err := listener.Accept()
 		if err != nil {

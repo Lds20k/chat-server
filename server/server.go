@@ -119,6 +119,7 @@ main_loop:
 
 	leaving <- ch
 	messages <- user_obj.nick + " saiu do servidor"
+	delete(users, user_obj.nick)
 	conn.Close()
 }
 
